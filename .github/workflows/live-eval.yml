@@ -12,7 +12,7 @@ env:
 
 jobs:
   pytest-live:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,11 +25,11 @@ jobs:
         with: { name: live-results, path: results/ }
 
   promptfoo-agent:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - run: mkdir -p results && npx --yes promptfoo@0.125.1 eval -c evals/agent/promptfooconfig.js --no-cache
         env:
           AGENT_URL: ${{ env.BASE_URL }}/agent
