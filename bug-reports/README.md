@@ -10,5 +10,6 @@ Defects found while building the evaluation suite. Each one has a reproduction, 
 | [BUG-004](BUG-004-false-out-of-stock.md) | Sales agent · part matching | High | Fixed |
 | [BUG-005](BUG-005-journal-silently-balanced.md) | Invoice reader · SCF journal | High | Fixed |
 | [BUG-006](BUG-006-cash-threshold.md) | Invoice reader · tax alerts | Medium | Fixed |
+| [BUG-007](BUG-007-network-error-500.md) | Invoice reader + RAG · Gemini calls | Medium | Fixed (found by `live-eval`) |
 
 The sales agent's source is private (client deployment); its reports reference the public demo, where every case can be reproduced.

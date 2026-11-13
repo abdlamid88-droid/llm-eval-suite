@@ -6,6 +6,7 @@
 """
 import math
 import os
+import time
 
 import httpx
 
@@ -14,6 +15,7 @@ CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.1-flash-lite")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 TIMEOUT = float(os.getenv("LLM_TIMEOUT", "120"))  # النماذج المحلية أبطأ، فالمهلة أطول
+RETRY_DELAY = float(os.getenv("RETRY_DELAY", "1.5"))
 BATCH = 32
 
 # بعض نماذج التضمين المحلية (مثل nomic-embed-text) تتطلب بادئة تميّز الوثيقة عن السؤال
@@ -57,14 +59,23 @@ if PROVIDER == "gemini":
     _gemini = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     def _gemini_call(fn, *args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except genai_errors.APIError as e:
-            if e.code == 429:
-                raise QuotaError(str(e)) from e
-            raise ProviderError(str(e)) from e
-        except httpx.HTTPError as e:
-            raise ProviderError(str(e)) from e
+        """إعادة محاولة واحدة للأعطال اللحظية. أخطاء الشبكة تُلتقط عامةً لأن مكتبة Gemini
+        تستخدم httpx أو httpx2 حسب الإصدار؛ التقاط httpx وحده ترك انقطاع الشبكة يظهر كخطأ 500."""
+        for attempt in (1, 2):
+            try:
+                return fn(*args, **kwargs)
+            except genai_errors.APIError as e:
+                if e.code == 429:
+                    raise QuotaError(str(e)) from e
+                if attempt == 1 and (e.code or 0) >= 500:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                raise ProviderError(str(e)) from e
+            except Exception as e:  # انقطاع الشبكة، مهلة، DNS...
+                if attempt == 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                raise ProviderError(f"{e.__class__.__name__}: {e}") from e
 
     def embed(texts: list[str], is_query: bool) -> list[list[float]]:
         task = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"

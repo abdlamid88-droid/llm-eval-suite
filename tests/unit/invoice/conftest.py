@@ -37,10 +37,13 @@ class FakeModels:
     def __init__(self):
         self.next = invoice()
         self.error = None
+        self.errors = []  # أخطاء تُرفع بالترتيب قبل النجاح (لاختبار إعادة المحاولة)
         self.calls = []
 
     def generate_content(self, model, contents, config):
         self.calls.append({"model": model, "mime": contents[0].inline_data.mime_type, "schema": config.response_schema})
+        if self.errors:
+            raise self.errors.pop(0)
         if self.error:
             raise self.error
         from app.extractor import Invoice
@@ -50,6 +53,7 @@ class FakeModels:
 @pytest.fixture()
 def gemini(monkeypatch):
     from app import extractor
+    monkeypatch.setattr(extractor, "RETRY_DELAY", 0, raising=False)
     fake = FakeModels()
     monkeypatch.setattr(extractor, "_client", SimpleNamespace(models=fake))
     return fake

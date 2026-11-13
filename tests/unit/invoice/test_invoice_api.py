@@ -93,3 +93,39 @@ def test_pc_compta_export_is_semicolon_csv_with_bom(client):
 def test_export_rejects_oversized_payload(client):
     r = client.post("/invoices/api/export/xlsx", json={"invoice": {}, "invoice_type": "purchase", "journal": [{}] * 60})
     assert r.status_code == 400
+
+
+# ---- انقطاع الشبكة وأعطال Gemini اللحظية ----
+# حادثة حقيقية: انقطع اتصال الخادم بـ Google لحظياً، فرفعت مكتبة Gemini httpx2.ConnectError
+# بينما الكود يلتقط httpx فقط، فوصل للزائر خطأ 500. (BUG-007)
+
+class NetworkDown(Exception):
+    """يحاكي httpx2.ConnectError: نوع خطأ شبكة لا يعرفه كودنا مسبقاً."""
+
+
+def test_transient_network_error_is_retried(client, gemini):
+    gemini.errors = [NetworkDown("[Errno 101] Network is unreachable")]
+    r = upload(client)
+    assert r.status_code == 200
+    assert len(gemini.calls) == 2
+
+
+def test_persistent_network_error_is_clear_503_not_500(client, gemini):
+    gemini.error = NetworkDown("[Errno 101] Network is unreachable")
+    r = upload(client)
+    assert r.status_code == 503
+    assert "تعذر تحليل الفاتورة" in r.json()["detail"]
+
+
+def test_gemini_server_error_is_retried(client, gemini):
+    from google.genai import errors
+    gemini.errors = [errors.ServerError(503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})]
+    assert upload(client).status_code == 200
+    assert len(gemini.calls) == 2
+
+
+def test_client_error_is_not_retried(client, gemini):
+    from google.genai import errors
+    gemini.error = errors.ClientError(400, {"error": {"code": 400, "message": "bad", "status": "INVALID_ARGUMENT"}})
+    assert upload(client).status_code == 503
+    assert len(gemini.calls) == 1

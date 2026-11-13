@@ -29,7 +29,8 @@ The demos run on a home server, so they may occasionally be offline; the live te
 
 - **Mutation check:** I broke the code on purpose in three critical places (silently balancing a wrong journal entry, the old cash threshold, showing unrelated sources on a refusal). Each break made at least one unit test fail.
 - **Before/after on the sales agent:** against the agent's original code, the live agent tests failed **8 of 11**; after the fixes they all pass. On the 18 dialect questions, correct parts went from **0/18 to 16/18** (the other two are correct behaviour).
-- **Defects found:** six, written up in [`bug-reports/`](bug-reports/) with reproduction, root cause, fix and the test that guards each one.
+- **Found in production by the weekly live run:** a brief network outage on the server surfaced as HTTP 500 because the code caught `httpx` errors while the Gemini SDK now raises `httpx2` ones ([BUG-007](bug-reports/BUG-007-network-error-500.md)).
+- **Defects found:** seven, written up in [`bug-reports/`](bug-reports/) with reproduction, root cause, fix and the test that guards each one.
 
 ## Run it
 

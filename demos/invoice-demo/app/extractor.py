@@ -1,15 +1,17 @@
 """استخراج بيانات الفاتورة وتوليد القيد المحاسبي عبر Gemini بمخرجات مهيكلة (Structured Output).
 الـ prompt مأخوذ من مشروع blind_invoice_mvp؛ الفرق أن الهيكل يُفرض بمخطط Pydantic فلا يتعطل تحليل JSON.
 """
+import logging
 import os
+import time
 
-import httpx
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import BaseModel, Field
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+RETRY_DELAY = float(os.getenv("RETRY_DELAY", "1.5"))
 _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 
@@ -78,28 +80,47 @@ PROMPT = """أنت خبير محاسبة جزائري. استخرج بيانات
 - إن لم تكن الوثيقة فاتورة فاجعل is_invoice = false واترك بقية الحقول فارغة."""
 
 
+log = logging.getLogger("uvicorn.error")
+
+
+def _call_gemini(**kwargs):
+    """استدعاء Gemini مع إعادة محاولة واحدة للأعطال اللحظية.
+    أخطاء الشبكة لا تُلتقط بنوع محدد: إصدارات مكتبة Gemini تستخدم httpx أو httpx2 حسب الإصدار،
+    والتقاط httpx وحده ترك انقطاع الشبكة يصل للزائر كخطأ 500."""
+    for attempt in (1, 2):
+        try:
+            return _client.models.generate_content(**kwargs)
+        except genai_errors.APIError as e:
+            if e.code == 429:
+                raise QuotaError(str(e)) from e
+            if attempt == 1 and (e.code or 0) >= 500:
+                log.warning("Gemini %s، إعادة المحاولة", e.code)
+                time.sleep(RETRY_DELAY)
+                continue
+            raise ProviderError(str(e)) from e
+        except Exception as e:  # انقطاع الشبكة، مهلة، DNS...
+            if attempt == 1:
+                log.warning("تعذر الاتصال بـ Gemini (%s)، إعادة المحاولة", e.__class__.__name__)
+                time.sleep(RETRY_DELAY)
+                continue
+            raise ProviderError(f"{e.__class__.__name__}: {e}") from e
+
+
 def extract(file_bytes: bytes, mime_type: str, invoice_type: str, lang: str) -> dict:
     prompt = PROMPT.format(
         kind="مشتريات (الطرف الآخر هو المورد)" if invoice_type == "purchase" else "مبيعات (الطرف الآخر هو الزبون)",
         lang="الفرنسية" if lang == "fr" else "العربية",
         rules=SCF_RULES[invoice_type],
     )
-    try:
-        resp = _client.models.generate_content(
-            model=MODEL,
-            contents=[types.Part.from_bytes(data=file_bytes, mime_type=mime_type), prompt],
-            config=types.GenerateContentConfig(
-                temperature=0,
-                response_mime_type="application/json",
-                response_schema=Invoice,
-            ),
-        )
-    except genai_errors.APIError as e:
-        if e.code == 429:
-            raise QuotaError(str(e)) from e
-        raise ProviderError(str(e)) from e
-    except httpx.HTTPError as e:
-        raise ProviderError(str(e)) from e
+    resp = _call_gemini(
+        model=MODEL,
+        contents=[types.Part.from_bytes(data=file_bytes, mime_type=mime_type), prompt],
+        config=types.GenerateContentConfig(
+            temperature=0,
+            response_mime_type="application/json",
+            response_schema=Invoice,
+        ),
+    )
 
     parsed = resp.parsed
     if parsed is None:

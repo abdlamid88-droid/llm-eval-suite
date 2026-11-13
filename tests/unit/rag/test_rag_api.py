@@ -85,3 +85,14 @@ def test_provider_quota_error_becomes_clear_429(client, session, monkeypatch):
     monkeypatch.setattr(providers, "embed", boom)
     r = client.post("/api/ask", headers=session, json={"question": "invoice total"})
     assert r.status_code == 429 and "حصتها المجانية" in r.json()["detail"]
+
+
+def test_network_failure_is_503_not_500(client, session, monkeypatch):
+    from app import providers
+    upload(client, session)
+
+    def down(*a, **k):
+        raise providers.ProviderError("ConnectError: [Errno 101] Network is unreachable")
+    monkeypatch.setattr(providers, "embed", down)
+    r = client.post("/api/ask", headers=session, json={"question": "invoice total"})
+    assert r.status_code == 503 and "غير متاحة مؤقتاً" in r.json()["detail"]
