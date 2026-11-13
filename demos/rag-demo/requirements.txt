@@ -1,0 +1,8 @@
+fastapi==0.162.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+google-genai==3.0.0
+pypdf==6.17.0
+psycopg[binary]==3.3.8
+pgvector==0.5.1
+httpx==0.28.1

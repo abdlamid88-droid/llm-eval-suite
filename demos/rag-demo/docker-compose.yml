@@ -1,0 +1,21 @@
+services:
+  rag-demo:
+    build: .
+    container_name: rag_demo
+    restart: unless-stopped
+    env_file: .env
+    # يُفتح المنفذ على الجهاز نفسه فقط؛ الوصول العام يكون عبر Tailscale Funnel
+    ports:
+      - "127.0.0.1:8010:8000"
+    # يسمح بالوصول إلى Ollama/vLLM إن كان يعمل على الجهاز نفسه خارج Docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 350m
+    cpus: 1.0
+    networks:
+      - pgnet
+
+networks:
+  pgnet:
+    external: true
+    name: ${PG_NETWORK}

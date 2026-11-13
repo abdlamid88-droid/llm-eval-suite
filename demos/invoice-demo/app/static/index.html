@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>قارئ الفواتير الذكي — ديمو</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e4e2da;
+    --accent: #0f6e56; --accent-soft: #e3f1ec; --warn: #9a6200; --warn-soft: #fbf1dc;
+    --bad: #a3412b; --bad-soft: #f8e5df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151614; --panel: #1e1f1c; --ink: #ecebe6; --muted: #9a998f; --line: #2e2f2b;
+            --accent: #4cc39d; --accent-soft: #1d3029; --warn: #e2b04a; --warn-soft: #33291a;
+            --bad: #e48a72; --bad-soft: #3a2420; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.7 "IBM Plex Sans Arabic", system-ui, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
+  .lead { margin: 0 0 20px; color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin-bottom: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg input { display: none; }
+  .seg label { padding: 6px 14px; cursor: pointer; font-size: .92rem; color: var(--muted); }
+  .seg input:checked + label { background: var(--accent); color: #fff; }
+  .lbl { font-size: .9rem; color: var(--muted); margin-inline-end: 6px; }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; cursor: pointer; color: var(--muted); transition: .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .row-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: center; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; padding: 8px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .hint { font-size: .85rem; color: var(--muted); }
+  .status { margin-top: 10px; font-size: .95rem; }
+  .err { color: var(--bad); }
+  #result { display: none; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .preview img { width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: .95rem; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+  .unsure { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 0 6px; font-size: .8rem; margin-inline-start: 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  .ids { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  @media (max-width: 760px) { .ids { grid-template-columns: 1fr 1fr; } }
+  .id { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: .85rem; }
+  .id b { display: block; font-size: .8rem; color: var(--muted); font-weight: 500; }
+  .id .v { font-family: ui-monospace, monospace; direction: ltr; text-align: right; }
+  .ok { color: var(--accent); } .bad { color: var(--bad); } .na { color: var(--muted); }
+  .alert { border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: .92rem; }
+  .alert.warning { background: var(--warn-soft); color: var(--warn); }
+  .alert.critical { background: var(--bad-soft); color: var(--bad); }
+  .alert.none { background: var(--accent-soft); color: var(--accent); }
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: left; direction: ltr; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tfoot td { font-weight: 600; border-bottom: 0; }
+  .badge { display: inline-block; border-radius: 99px; padding: 2px 12px; font-size: .85rem; }
+  .badge.ok { background: var(--accent-soft); }
+  .badge.bad { background: var(--bad-soft); }
+  .foot { font-size: .82rem; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>قارئ الفواتير الذكي</h1>
+  <p class="lead">ارفع صورة فاتورة أو ملف PDF، فيستخرج النظام بياناتها ويولّد القيد المحاسبي وفق النظام المحاسبي المالي الجزائري (SCF)، ويتحقق من المعرفات الجبائية، ثم يصدّرها إلى Excel وPC Compta.</p>
+
+  <div class="card">
+    <div class="controls">
+      <div><span class="lbl">نوع الفاتورة</span>
+        <span class="seg">
+          <input type="radio" name="type" id="t-p" value="purchase" checked><label for="t-p">مشتريات</label>
+          <input type="radio" name="type" id="t-s" value="sale"><label for="t-s">مبيعات</label>
+        </span></div>
+      <div><span class="lbl">لغة الحسابات</span>
+        <span class="seg">
+          <input type="radio" name="lang" id="l-ar" value="ar" checked><label for="l-ar">العربية</label>
+          <input type="radio" name="lang" id="l-fr" value="fr"><label for="l-fr">Français</label>
+        </span></div>
+    </div>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,application/pdf" hidden>
+      <span>اسحب الفاتورة هنا أو اضغط للاختيار — JPG أو PNG أو PDF حتى 5 ميغابايت</span>
+    </label>
+    <div class="row-btns">
+      <button class="primary" id="sample">جرّب بفاتورة نموذجية</button>
+      <span class="hint">فاتورة وهمية جاهزة، لمن لا يملك فاتورة الآن.</span>
+    </div>
+    <div class="status" id="status"></div>
+    <p class="hint">نسخة تجريبية على الطبقة المجانية من Gemini، وقد تستخدم Google المحتوى المرسل لتحسين خدماتها، فلا ترفع فواتير حقيقية حساسة. لا يُحفظ أي ملف على الخادم.</p>
+  </div>
+
+  <div id="result">
+    <div class="grid">
+      <div class="card preview" id="preview"></div>
+      <div class="card">
+        <h2>بيانات الفاتورة</h2>
+        <dl class="kv" id="fields"></dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>التدقيق الجبائي</h2>
+      <div class="ids" id="ids"></div>
+      <div style="margin-top:12px" id="alerts"></div>
+    </div>
+
+    <div class="card">
+      <h2>بنود الفاتورة</h2>
+      <div class="tbl-wrap"><table id="items"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>القيد المحاسبي (SCF) <span id="balance"></span></h2>
+      <div class="tbl-wrap"><table id="journal"></table></div>
+      <div class="row-btns">
+        <button class="primary" id="dl-xlsx">تنزيل Excel</button>
+        <button id="dl-pc">تنزيل ملف PC Compta</button>
+        <span class="hint" id="took"></span>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">التنبيهات الجبائية استرشادية وتتحقق من الصيغة لا من تسجيل المعرّف لدى الإدارة الجبائية؛ راجع آخر قانون مالية. النسخة الكاملة من النظام تضم أرشيفاً وصندوق مراجعة ومستشاراً مالياً ولوحة مؤشرات.</p>
+</div>
+
+<script>
+const base = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/";
+const $ = id => document.getElementById(id);
+let last = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = n => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const val = name => document.querySelector(`input[name=${name}]:checked`).value;
+
+async function analyze(file) {
+  if (!file) return;
+  $("status").textContent = `جارٍ تحليل «${file.name}»... قد يستغرق ذلك بين 5 و20 ثانية.`;
+  $("sample").disabled = true;
+  const fd = new FormData();
+  fd.append("file", file); fd.append("invoice_type", val("type")); fd.append("lang", val("lang"));
+  try {
+    const r = await fetch(base + "api/extract", { method: "POST", body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || "حدث خطأ، حاول مجدداً.");
+    last = data;
+    render(data, file);
+    $("status").textContent = "";
+  } catch (e) {
+    $("status").innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  }
+  $("sample").disabled = false;
+}
+
+function render(d, file) {
+  const inv = d.invoice, unsure = new Set(inv.uncertain_fields || []);
+  $("preview").innerHTML = file.type.startsWith("image/")
+    ? `<img alt="الفاتورة المرفوعة" src="${URL.createObjectURL(file)}">`
+    : `<h2>الملف المرفوع</h2><p>${esc(file.name)} (PDF)</p>`;
+
+  const rows = [["الطرف الآخر", "vendor_name"], ["رقم الفاتورة", "invoice_number"], ["التاريخ", "date"],
+    ["الإجمالي TTC", "total_amount", true], ["الرسم TVA", "tax_amount", true], ["التصنيف", "category"]];
+  $("fields").innerHTML = rows.map(([label, key, isMoney]) => {
+    const v = isMoney ? `${money(inv[key])} ${esc(inv.currency || "")}` : esc(inv[key] || "—");
+    return `<dt>${label}</dt><dd>${v}${unsure.has(key) ? '<span class="unsure">يحتاج مراجعة</span>' : ""}</dd>`;
+  }).join("") + (inv.notes ? `<dt>ملاحظات</dt><dd>${esc(inv.notes)}</dd>` : "");
+
+  const names = { nif: "NIF", rc: "RC", article: "Article", nis: "NIS" };
+  $("ids").innerHTML = Object.entries(d.identifiers).map(([k, r]) => {
+    const cls = r.valid === true ? "ok" : r.valid === false ? "bad" : "na";
+    const mark = r.valid === true ? "✓" : r.valid === false ? "✗" : "—";
+    return `<div class="id"><b>${names[k]}</b><div class="v">${esc(r.value || "—")}</div><span class="${cls}">${mark} ${esc(r.message)}</span></div>`;
+  }).join("");
+
+  $("alerts").innerHTML = d.alerts.length
+    ? d.alerts.map(a => `<div class="alert ${a.severity}">${esc(a.message)}</div>`).join("")
+    : `<div class="alert none">لا توجد تنبيهات: الحسابات والنسب والمعرفات سليمة.</div>`;
+
+  const items = inv.items || [];
+  $("items").innerHTML = items.length
+    ? `<thead><tr><th>الوصف</th><th class="num">الكمية</th><th class="num">سعر الوحدة</th><th class="num">المجموع</th></tr></thead><tbody>` +
+      items.map(i => `<tr><td>${esc(i.description)}</td><td class="num">${i.quantity}</td><td class="num">${money(i.unit_price)}</td><td class="num">${money(i.total)}</td></tr>`).join("") + "</tbody>"
+    : `<tbody><tr><td>لم تُستخرج بنود تفصيلية.</td></tr></tbody>`;
+
+  $("journal").innerHTML = `<thead><tr><th>الحساب</th><th class="num">مدين</th><th class="num">دائن</th></tr></thead><tbody>` +
+    d.journal.map(e => `<tr><td>${esc(e.account)}</td><td class="num">${e.debit ? money(e.debit) : ""}</td><td class="num">${e.credit ? money(e.credit) : ""}</td></tr>`).join("") +
+    `</tbody><tfoot><tr><td>المجموع</td><td class="num">${money(d.balance.total_debit)}</td><td class="num">${money(d.balance.total_credit)}</td></tr></tfoot>`;
+  $("balance").innerHTML = d.balance.balanced
+    ? `<span class="badge ok">متوازن${d.balance.rounding_adjusted ? " (بعد تصحيح تقريب)" : ""}</span>`
+    : `<span class="badge bad">غير متوازن: ${money(d.balance.difference)}</span>`;
+  $("took").textContent = `حُلّلت في ${d.seconds} ثانية`;
+
+  $("result").style.display = "block";
+  $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function download(kind, filename) {
+  if (!last) return;
+  const r = await fetch(base + "api/export/" + kind, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ invoice: last.invoice, invoice_type: last.invoice_type, journal: last.journal }),
+  });
+  if (!r.ok) { $("status").innerHTML = '<span class="err">تعذر التصدير.</span>'; return; }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await r.blob()); a.download = filename; a.click();
+}
+
+$("file").onchange = e => analyze(e.target.files[0]);
+const drop = $("drop");
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); analyze(e.dataTransfer.files[0]); };
+$("sample").onclick = async () => {
+  const blob = await (await fetch(base + "sample-invoice.png")).blob();
+  analyze(new File([blob], "facture-specimen.png", { type: "image/png" }));
+};
+$("dl-xlsx").onclick = () => download("xlsx", "facture_scf.xlsx");
+$("dl-pc").onclick = () => download("pccompta", "pc_compta_journal.csv");
+</script>
+</body>
+</html>

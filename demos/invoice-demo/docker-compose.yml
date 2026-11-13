@@ -1,0 +1,11 @@
+services:
+  invoice-demo:
+    build: .
+    container_name: invoice_demo
+    restart: unless-stopped
+    env_file: .env
+    # المنفذ على الجهاز نفسه فقط؛ الوصول العام عبر Tailscale Funnel على المسار /invoices
+    ports:
+      - "127.0.0.1:8020:8000"
+    mem_limit: 200m
+    cpus: 1.0

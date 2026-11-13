@@ -1,0 +1,38 @@
+name: live-eval
+
+# يستدعي الديموهات المنشورة ويستهلك حصة Gemini: يدوياً أو مرة في الأسبوع فقط.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+env:
+  BASE_URL: ${{ vars.BASE_URL || 'https://abdelhmid-vostro-1015.tailc599d9.ts.net' }}
+  PROMPTFOO_DISABLE_TELEMETRY: "1"
+
+jobs:
+  pytest-live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: mkdir -p results && pytest tests/live -v --junitxml=results/live.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: live-results, path: results/ }
+
+  promptfoo-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: mkdir -p results && npx --yes promptfoo@0.125.1 eval -c evals/agent/promptfooconfig.js --no-cache
+        env:
+          AGENT_URL: ${{ env.BASE_URL }}/agent
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: promptfoo-agent, path: results/ }
